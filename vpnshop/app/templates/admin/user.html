@@ -1,0 +1,76 @@
+{% extends "admin/base.html" %}
+{% block content %}
+<h1 style="font-size:30px">{{ u.display }} {% if u.is_banned %}<span class="badge bad">заблокирован</span>{% endif %}</h1>
+<p class="muted">Telegram ID {{ u.tg_id }} · {{ u.first_name or '—' }} · с {{ u.created_at|dt }} · пробный период: {{ 'использован' if u.trial_used else 'не использован' }}
+{% if referrer %}· пригласил: <a href="/admin/users/{{ referrer.id }}">{{ referrer.display }}</a>{% endif %}
+{% if stats.invited %}· привёл: {{ stats.invited }} (оплатили: {{ stats.paid }}, +{{ stats.days|days }}){% endif %}
+{% if u.bonus_days %}· бонус ждёт применения: {{ u.bonus_days|days }}{% endif %}</p>
+
+<div class="row" style="margin-bottom:8px">
+  <form method="post" action="/admin/users/{{ u.id }}/ban" class="inline"
+        onsubmit="return confirm('{{ 'Разблокировать' if u.is_banned else 'Заблокировать' }} пользователя?')">
+    {{ csrf_input() }}
+    <button class="{{ 'ghost' if u.is_banned else 'danger' }} small">{{ 'Разблокировать' if u.is_banned else 'Заблокировать' }}</button>
+  </form>
+  <form method="post" action="/admin/users/{{ u.id }}/grant" class="row" style="align-items:center">
+    {{ csrf_input() }}
+    <select name="plan_id">{% for p in plans %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
+    <button class="small">Выдать ключ бесплатно</button>
+  </form>
+</div>
+<p class="muted small">Блокировка закрывает доступ к боту и кабинету. Уже выданные ключи продолжают работать — отзовите их отдельно, если нужно.</p>
+
+<h2 style="font-size:22px;margin:28px 0 12px">Персональные цены</h2>
+<form method="post" action="/admin/users/{{ u.id }}/prices" class="card stack" style="max-width:820px">
+  {{ csrf_input() }}
+  <p class="muted small" style="margin:0">Действуют только для этого пользователя — в боте, на сайте и при оплате. Если подходит несколько скидок, применяется самая выгодная.
+  Свою цену оставьте пустой, чтобы вернуть обычную. Минимум 1 ₽.</p>
+  <div><label>Скидка на все тарифы, % (0 — нет)</label><input name="discount_percent" type="number" min="0" max="95" value="{{ u.discount_percent or 0 }}" style="width:120px"></div>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Тариф</th><th>Обычная цена</th><th>Своя цена, ₽</th><th>Пользователь платит</th></tr>
+      {% for p in plans %}
+      {% set pr = prices[p.id] %}
+      <tr>
+        <td>{{ p.name }}</td>
+        <td>{{ p.price_kop|rub }} ₽</td>
+        <td><input name="price_{{ p.id }}" value="{{ (overrides[p.id]|rub) if p.id in overrides else '' }}" placeholder="—" style="width:110px"></td>
+        <td>{% if pr[0] < pr[1] %}<b style="color:var(--ok)">{{ pr[0]|rub }} ₽</b>{% else %}{{ pr[0]|rub }} ₽{% endif %}</td>
+      </tr>
+      {% else %}<tr><td colspan="4" class="muted">Нет активных тарифов</td></tr>{% endfor %}
+    </table>
+  </div>
+  <div class="row"><button type="submit">Сохранить цены</button></div>
+</form>
+
+<h2 style="font-size:22px;margin:28px 0 12px">Личные реферальные условия</h2>
+<form method="post" action="/admin/users/{{ u.id }}/ref" class="card row" style="max-width:820px;align-items:end">
+  {{ csrf_input() }}
+  <div><label>Награда за каждого оплатившего друга, дней</label>
+    <input name="ref_reward_days" type="number" min="0" max="3650" value="{{ u.ref_reward_days if u.ref_reward_days is not none else '' }}" placeholder="общие условия" style="width:200px"></div>
+  <button type="submit">Сохранить</button>
+  <span class="muted small" style="flex-basis:100%">Для блогеров и партнёров. Пусто — действуют общие настройки из раздела «Рефералка». Ограничения (лимиты, срок, мин. сумма) применяются и к личным условиям.</span>
+</form>
+
+<h2 style="font-size:22px;margin:28px 0 12px">Ключи</h2>
+<div class="table-wrap">
+  <table>
+    <tr><th>#</th><th>Тариф</th><th>До</th><th>Статус</th></tr>
+    {% for k in keys %}
+    <tr><td>{{ k.id }}</td><td>{{ k.plan.name if k.plan else ('пробный' if k.is_trial else '—') }}</td><td>{{ k.expires_at|dt }}</td>
+      <td>{% if not k.active %}<span class="badge bad">отозван</span>{% elif k.expired %}<span class="badge warn">истёк</span>{% else %}<span class="badge ok">активен</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="4" class="muted">Ключей нет</td></tr>{% endfor %}
+  </table>
+</div>
+
+<h2 style="font-size:22px;margin:28px 0 12px">Заказы</h2>
+<div class="table-wrap">
+  <table>
+    <tr><th>№</th><th>Дата</th><th>Тариф</th><th>Сумма</th><th>Статус</th></tr>
+    {% for o in orders %}
+    <tr><td>{{ o.id }}</td><td>{{ o.created_at|dt }}</td><td>{{ o.plan.name }}</td><td>{% if o.base_kop and o.base_kop > o.amount_kop %}<s class="muted small">{{ o.base_kop|rub }}</s> {% endif %}{{ o.amount_kop|rub }} ₽</td>
+      <td>{% if o.status == 'paid' %}<span class="badge ok">оплачен</span>{% elif o.status == 'canceled' %}<span class="badge bad">отменён</span>{% else %}<span class="badge warn">ожидает</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="5" class="muted">Заказов нет</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

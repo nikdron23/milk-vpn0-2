@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Кабинет — {{ cfg.brand_name }}{% endblock %}
+{% block nav %}<a href="/setup">Как подключить</a><span class="who">{{ user.display }}</span><a href="/logout">Выйти</a>{% endblock %}
+{% block content %}
+<h1 style="font-size:34px;margin-bottom:22px">Мои ключи</h1>
+
+{% if trial %}
+<form method="post" action="/cabinet/trial" class="card row" style="margin-bottom:18px;justify-content:space-between;align-items:center">
+  {{ csrf_input() }}
+  <div><h3>🎁 Пробный период</h3><div class="muted small">Бесплатный пробный ключ — один раз на аккаунт</div></div>
+  <button type="submit">Получить ключ</button>
+</form>
+{% endif %}
+
+<section class="grid">
+  {% for k in keys %}
+  {% set u = usage.get(k.id) %}
+  <div class="card stack">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h3>Ключ #{{ k.id }}</h3>
+      {% if k.expired %}<span class="badge bad">истёк</span>{% else %}<span class="badge ok">активен</span>{% endif %}
+    </div>
+    <div class="muted small">{{ k.plan.name if k.plan else ('Пробный' if k.is_trial else '—') }} · до {{ k.expires_at|dt }}</div>
+    {% if u %}
+      {% set used, total = u %}
+      <div>
+        <div class="bar"><i style="width: {{ ((used / total * 100)|round|int if total else 0) }}%"></i></div>
+        <div class="muted small" style="margin-top:4px">{{ used|hbytes }} / {{ total|hbytes if total else '∞' }}</div>
+      </div>
+    {% endif %}
+    <a class="btn small" href="/cabinet/key/{{ k.id }}">Открыть</a>
+  </div>
+  {% else %}
+  <p class="muted">У вас пока нет ключей. Выберите тариф ниже{% if trial %} или получите пробный период{% endif %}.</p>
+  {% endfor %}
+</section>
+
+{% if ref_enabled and ref_link %}
+<h2 style="font-size:26px;margin:36px 0 14px">Приведи друга</h2>
+<div class="card">
+  <div class="ref-box">
+    <div>
+      {% if user.ref_reward_days is not none %}<p style="margin:0 0 8px"><b>Ваши личные условия: +{{ user.ref_reward_days|days }} за оплату друга.</b></p>{% endif %}
+      <ul class="muted" style="margin:0 0 12px;padding-left:18px">{% for line in ref_rules %}<li>{{ line }}</li>{% endfor %}</ul>
+      <div class="code">{{ ref_link }}</div>
+    </div>
+    <button data-copy="{{ ref_link }}">Копировать ссылку</button>
+  </div>
+  <div class="pill-stats">
+    <div><b>{{ stats.invited }}</b><span>приглашено</span></div>
+    <div><b>{{ stats.paid }}</b><span>оплатили</span></div>
+    <div><b>{{ stats.days }}</b><span>дней начислено</span></div>
+    {% if stats.pending %}<div><b>{{ stats.pending }}</b><span>ждут применения</span></div>{% endif %}
+  </div>
+</div>
+{% endif %}
+
+<h2 style="font-size:26px;margin:36px 0 14px">Купить новый ключ</h2>
+<section class="grid">
+  {% for p in plans %}
+  <form method="post" action="/cabinet/buy" class="card">
+    {{ csrf_input() }}
+    <input type="hidden" name="plan_id" value="{{ p.id }}">
+    <h3>{{ p.name }}</h3>
+    {% set pr = prices[p.id] %}
+    <div class="price" style="font-size:34px">{{ pr[0]|rub }} <small>₽</small>{% if pr[0] < pr[1] %} <s class="muted" style="font-size:18px;font-weight:400">{{ pr[1]|rub }} ₽</s>{% endif %}</div>
+    {% if pr[0] < pr[1] %}<div class="small" style="color:var(--ok);margin-bottom:4px">Ваша персональная цена</div>{% endif %}
+    <div class="muted small" style="margin-bottom:14px">{{ p.days|days }} · {% if p.traffic_gb %}{{ p.traffic_gb }} ГБ{% else %}безлимит{% endif %}</div>
+    <button type="submit">Оплатить</button>
+  </form>
+  {% endfor %}
+</section>
+
+<h2 style="font-size:26px;margin:36px 0 14px">История платежей</h2>
+<div class="table-wrap">
+  <table>
+    <tr><th>№</th><th>Дата</th><th>Тариф</th><th>Сумма</th><th>Статус</th></tr>
+    {% for o in orders %}
+    <tr>
+      <td>{{ o.id }}</td><td>{{ o.created_at|dt }}</td><td>{{ o.plan.name }}</td><td>{% if o.base_kop and o.base_kop > o.amount_kop %}<s class="muted small">{{ o.base_kop|rub }}</s> {% endif %}{{ o.amount_kop|rub }} ₽</td>
+      <td>{% if o.status == 'paid' %}<span class="badge ok">оплачен</span>{% elif o.status == 'canceled' %}<span class="badge bad">отменён</span>{% else %}<span class="badge warn">ожидает</span>{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="muted">Платежей пока нет</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

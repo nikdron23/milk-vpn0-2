@@ -1,0 +1,110 @@
+{% extends "admin/base.html" %}
+{% macro chk(name) %}{{ 'checked' if v[name] in ('1','true','on') }}{% endmacro %}
+{% block content %}
+<h1 style="font-size:32px;margin-bottom:8px">Реферальная программа и пробный период</h1>
+<p class="muted">Изменения применяются сразу. Бонусные дни добавляются к ключу автоматически; если у пригласившего пока нет ключа — дождутся его первой покупки.
+Награда начисляется только после реальной оплаты друга, а не за регистрацию.</p>
+
+<form method="post" action="/admin/settings" class="stack" style="max-width:820px">
+  {{ csrf_input() }}
+
+  <div class="card stack">
+    <h3>Программа «Приведи друга»</h3>
+    <label class="check"><input type="checkbox" name="ref_enabled" value="1" {{ chk('ref_enabled') }}> Реферальная программа включена</label>
+    <p class="muted small" style="margin:0">Выключатель скрывает кнопки в боте и блок в кабинете, новые привязки и награды не создаются.</p>
+  </div>
+
+  <div class="card stack">
+    <h3>Награда пригласившему</h3>
+    <div class="row">
+      <div><label>Тип награды</label>
+        <select name="ref_inviter_mode">
+          <option value="days" {{ 'selected' if v.ref_inviter_mode == 'days' }}>Фиксированное число дней</option>
+          <option value="percent" {{ 'selected' if v.ref_inviter_mode == 'percent' }}>% от срока купленного другом тарифа</option>
+        </select></div>
+      <div><label>Дней (для фиксированной)</label><input name="ref_inviter_days" type="number" min="0" max="3650" value="{{ v.ref_inviter_days }}" style="width:130px"></div>
+      <div><label>% срока (для процентной)</label><input name="ref_inviter_percent" type="number" min="0" max="500" value="{{ v.ref_inviter_percent }}" style="width:130px"></div>
+    </div>
+    <p class="muted small" style="margin:0">Пример процентной награды: друг купил 30 дней, 20 % → пригласивший получает 6 дней. Награда за годовой тариф будет больше, чем за месячный.</p>
+    <label class="check"><input type="checkbox" name="ref_first_only" value="1" {{ chk('ref_first_only') }}> Только за первую оплату друга (иначе — за каждую его оплату)</label>
+    <div><label>Минимальная сумма заказа друга для награды, ₽ (0 — любая)</label><input name="ref_min_amount" type="number" min="0" value="{{ v.ref_min_amount }}" style="width:160px"></div>
+  </div>
+
+  <div class="card stack">
+    <h3>Что получает приглашённый</h3>
+    <div class="row">
+      <div><label>Бонус к первой покупке, дней</label><input name="ref_invitee_days" type="number" min="0" max="3650" value="{{ v.ref_invitee_days }}" style="width:170px"></div>
+      <div><label>Скидка на первую покупку, %</label><input name="ref_invitee_discount" type="number" min="0" max="90" value="{{ v.ref_invitee_discount }}" style="width:170px"></div>
+    </div>
+    <p class="muted small" style="margin:0">Оба бонуса можно включить одновременно. Скидка не суммируется с персональной ценой пользователя — применяется более выгодная. Чтобы отключить, поставьте 0.</p>
+  </div>
+
+  <div class="card stack">
+    <h3>Ограничения (защита от злоупотреблений)</h3>
+    <div class="row">
+      <div><label>Макс. наград на одного пригласившего</label><input name="ref_max_rewards" type="number" min="0" value="{{ v.ref_max_rewards }}" style="width:170px"></div>
+      <div><label>Макс. бонусных дней суммарно</label><input name="ref_max_days" type="number" min="0" value="{{ v.ref_max_days }}" style="width:170px"></div>
+      <div><label>Друг должен оплатить в течение, дней</label><input name="ref_window_days" type="number" min="0" max="3650" value="{{ v.ref_window_days }}" style="width:170px"></div>
+    </div>
+    <p class="muted small" style="margin:0">0 — без ограничения. Срок считается от регистрации друга в боте: после него ни награда, ни бонусы приглашённому не действуют.</p>
+  </div>
+
+  <div class="card stack">
+    <h3>Бонус за «круглое» число друзей</h3>
+    <div class="row">
+      <div><label>Каждого N-го оплатившего друга (0 — выключено)</label><input name="ref_milestone_every" type="number" min="0" max="1000" value="{{ v.ref_milestone_every }}" style="width:170px"></div>
+      <div><label>Дополнительно дней</label><input name="ref_milestone_days" type="number" min="0" max="3650" value="{{ v.ref_milestone_days }}" style="width:170px"></div>
+    </div>
+    <p class="muted small" style="margin:0">Например, N = 5 и 30 дней: за 5-го, 10-го, 15-го… друга, оплатившего подписку, пригласивший получит ещё 30 дней сверху. Считаются друзья, а не повторные оплаты.</p>
+  </div>
+
+  <div class="card stack">
+    <h3>Пробный период</h3>
+    <div class="row">
+      <div><label>Длительность, дней (0 — отключить)</label><input name="trial_days" type="number" min="0" max="3650" value="{{ v.trial_days }}" style="width:170px"></div>
+      <div><label>Трафик, ГБ (0 — безлимит)</label><input name="trial_gb" type="number" min="0" max="100000" value="{{ v.trial_gb }}" style="width:170px"></div>
+    </div>
+  </div>
+
+  <div class="row"><button type="submit">Сохранить</button></div>
+</form>
+
+<h2 style="font-size:22px;margin:32px 0 12px">Как это увидят пользователи</h2>
+<div class="card" style="max-width:820px">
+  {% if rules %}<ul style="margin:0;padding-left:18px">{% for line in rules %}<li>{{ line }}</li>{% endfor %}</ul>
+  {% else %}<span class="muted">Награды не настроены.</span>{% endif %}
+  <p class="muted small" style="margin:10px 0 0">Личные условия для отдельного пользователя (блогеры, партнёры) и персональные цены задаются в карточке пользователя.</p>
+</div>
+
+<h2 style="font-size:22px;margin:32px 0 12px">Статистика</h2>
+<section class="grid" style="max-width:820px">
+  <div class="card"><div class="stat">{{ invited_total }}</div><div class="stat-l">пришло по приглашениям</div></div>
+  <div class="card"><div class="stat">{{ rewarded_total }}</div><div class="stat-l">наград выдано</div></div>
+  <div class="card"><div class="stat">{{ days_total }}</div><div class="stat-l">дней начислено всего</div></div>
+</section>
+
+<h2 style="font-size:22px;margin:28px 0 12px">Топ приглашающих</h2>
+<div class="table-wrap" style="max-width:820px">
+  <table>
+    <tr><th>Пользователь</th><th>Наград</th><th>Дней</th></tr>
+    {% for u, n, d in top %}
+    <tr><td><a href="/admin/users/{{ u.id }}">{{ u.display }}</a></td><td>{{ n }}</td><td>{{ d }}</td></tr>
+    {% else %}<tr><td colspan="3" class="muted">Пока никто не получал наград</td></tr>{% endfor %}
+  </table>
+</div>
+
+<h2 style="font-size:22px;margin:28px 0 12px">Последние награды</h2>
+<div class="table-wrap" style="max-width:820px">
+  <table>
+    <tr><th>Дата</th><th>Пригласил</th><th>Друг</th><th>Дней</th><th>Заказ</th></tr>
+    {% for r, inviter, invitee in recent %}
+    <tr>
+      <td>{{ r.created_at|dt }}</td>
+      <td>{% if inviter %}<a href="/admin/users/{{ inviter.id }}">{{ inviter.display }}</a>{% else %}—{% endif %}</td>
+      <td>{% if invitee %}<a href="/admin/users/{{ invitee.id }}">{{ invitee.display }}</a>{% else %}—{% endif %}</td>
+      <td>+{{ r.days }}</td><td>№{{ r.order_id }}</td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="muted">Наград пока не было</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

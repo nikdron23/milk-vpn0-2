@@ -1,0 +1,14 @@
+{% extends "admin/base.html" %}
+{% block content %}
+<h1 style="font-size:32px;margin-bottom:16px">Заказы</h1>
+<p class="row">
+  <a class="btn small {{ '' if status == 'all' else 'ghost' }}" href="/admin/orders?status=all">Все</a>
+  <a class="btn small {{ '' if status == 'paid' else 'ghost' }}" href="/admin/orders?status=paid">Оплаченные</a>
+  <a class="btn small {{ '' if status == 'pending' else 'ghost' }}" href="/admin/orders?status=pending">Ожидают</a>
+  <a class="btn small {{ '' if status == 'canceled' else 'ghost' }}" href="/admin/orders?status=canceled">Отменены</a>
+</p>
+{% include "admin/_orders_table.html" %}
+<p class="muted small">«Выдать вручную» — если деньги пришли, а ключ не выдался (например, серверы были недоступны).
+Сначала проверьте платёж в личном кабинете ЮKassa: «Выдать вручную» не проверяет, что деньги действительно пришли.
+</p><p class="muted small">Новые платежи подтверждаются автоматически — уведомлением ЮKassa, при возврате пользователя на сайт и фоновой сверкой раз в 5 минут.</p>
+{% endblock %}
